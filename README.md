@@ -7,7 +7,7 @@
 - 📊 Dashboard realtime theo dõi usage
 - 💰 Tính chi phí tự động cho 350+ models  
 - 📋 Live Log panel
-- 🌐 **Transparent proxy** - intercept TẤT CẢ traffic tự động (WinDivert)
+- 🌐 All Captured Traffic panel
 
 ## Cài đặt
 
@@ -17,11 +17,21 @@
 
 ## Sử dụng
 
+### Cách 1: Safe Proxy Mode (Khuyến nghị)
 ```
 run.bat
 ```
+- Không gây mất mạng
+- Cần cấu hình proxy trong Windows hoặc app:
+  - Settings > Network > Proxy > Manual: `127.0.0.1:8080`
+  - Hoặc: `set HTTPS_PROXY=http://127.0.0.1:8080`
 
-**Chạy với quyền Administrator** để transparent proxy hoạt động.
+### Cách 2: Transparent Mode (Rủi ro)
+```
+run_transparent.bat
+```
+- Tự động bắt tất cả traffic (cần Admin)
+- ⚠️ Có thể gây mất mạng!
 
 **Lần đầu** - cài certificate:
 1. Chạy `run.bat` 

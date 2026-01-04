@@ -90,9 +90,17 @@ timeout /t 2 /nobreak >nul
 if "%USE_MITM%"=="1" (
     echo.
     echo ───────────────────────────────────────────────────────────────
-    echo   ✅ TRANSPARENT PROXY MODE (WinDivert)
+    echo   ✅ PROXY MODE - Safe, no network issues
     echo   Dashboard:  http://localhost:4001
-    echo   Intercepts ALL local traffic automatically!
+    echo   Proxy:      http://localhost:8080
+    echo ───────────────────────────────────────────────────────────────
+    echo.
+    echo   ⚠️  Setup Windows Proxy:
+    echo   Settings ^> Network ^> Proxy ^> Manual proxy
+    echo   Address: 127.0.0.1   Port: 8080
+    echo.
+    echo   Or set environment variable:
+    echo   set HTTPS_PROXY=http://127.0.0.1:8080
     echo ───────────────────────────────────────────────────────────────
     echo.
     echo   ⚠️  First time? Install certificate:
@@ -106,9 +114,8 @@ if "%USE_MITM%"=="1" (
     :: Open dashboard
     start "" "http://localhost:4001"
     
-    :: Start mitmproxy in LOCAL mode with FILTERED traffic
-    :: ONLY intercept AI API hosts - ignore everything else to prevent network issues
-    "%MITMDUMP%" --mode "local:!443@127.0.0.1" -s addon.py --set block_global=false --allow-hosts "api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com|aiplatform\.googleapis\.com|bedrock.*\.amazonaws\.com|api\.deepseek\.com|api\.mistral\.ai|api\.groq\.com|api\.together\.xyz|api\.perplexity\.ai|api\.cohere\.ai|api\.replicate\.com|api-inference\.huggingface\.co|api\.fireworks\.ai|kiro\.dev|35\.174\.34\."
+    :: Start mitmproxy in REGULAR proxy mode (port 8080) - SAFE, no WinDivert
+    "%MITMDUMP%" --listen-port 8080 -s addon.py --set block_global=false --showhost
     
     :: Cleanup when stopped
     echo.
