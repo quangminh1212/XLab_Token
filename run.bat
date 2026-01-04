@@ -4,31 +4,37 @@ setlocal EnableDelayedExpansion
 
 echo.
 echo ╔═══════════════════════════════════════════════════════════════╗
-echo ║        🔮 TokenSage - Safe Mode (No System Proxy)             ║
-echo ║        Only tracks apps configured to use this proxy          ║
+echo ║              🔮 TokenSage - AI Usage Tracker                  ║
+echo ║              Track your AI token usage and costs              ║
 echo ╚═══════════════════════════════════════════════════════════════╝
 echo.
 
 cd /d "%~dp0"
 
-:: Check if built
-if not exist "dist\proxy.js" (
-    echo [INFO] Project not built. Running setup first...
-    call setup.bat
-    if %ERRORLEVEL% NEQ 0 exit /b 1
+:: Check Node.js
+where node >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Node.js not found! Please install Node.js 18+
+    echo         Download: https://nodejs.org/
+    pause
+    exit /b 1
 )
 
-:: IMPORTANT: Do NOT enable Windows System Proxy
-:: This keeps other apps working normally
-echo [INFO] Safe Mode: Windows System Proxy will NOT be changed
-echo [INFO] Only apps configured to use localhost:4000 will be tracked
-echo.
+:: Check if built
+if not exist "dist\proxy.js" (
+    echo [INFO] Building project...
+    call npm run build
+    if %ERRORLEVEL% NEQ 0 (
+        echo [ERROR] Build failed!
+        pause
+        exit /b 1
+    )
+)
 
 :: Set environment
 set PROXY_PORT=4000
 set DASHBOARD_PORT=4001
 
-echo [INFO] Starting TokenSage Proxy Server...
 echo.
 echo ───────────────────────────────────────────────────────────────
 echo   Dashboard:  http://localhost:%DASHBOARD_PORT%
@@ -36,26 +42,23 @@ echo   Proxy:      http://localhost:%PROXY_PORT%
 echo   Stats API:  http://localhost:%PROXY_PORT%/stats
 echo ───────────────────────────────────────────────────────────────
 echo.
-echo   ⚠️  SAFE MODE - Other apps will NOT be affected!
+echo   Configure your AI IDE to use the proxy:
 echo.
-echo   Configure ONLY your AI IDE:
 echo   • Cursor: Settings ^> Models ^> Override OpenAI Base URL
 echo     Enter: http://localhost:%PROXY_PORT%/v1
 echo.
 echo   • Windsurf: Settings ^> API Configuration ^> Base URL
 echo     Enter: http://localhost:%PROXY_PORT%/v1
 echo.
-echo   • Or start IDE with env var:
-echo     set OPENAI_BASE_URL=http://localhost:%PROXY_PORT%/v1
+echo   • Kiro/Other: Set environment variable
+echo     OPENAI_BASE_URL=http://localhost:%PROXY_PORT%/v1
 echo ───────────────────────────────────────────────────────────────
 echo.
-echo   Press Ctrl+C to stop the server
+echo   Press Ctrl+C to stop
 echo.
 
-:: Open dashboard in browser after 2 seconds
-start /b cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:%DASHBOARD_PORT%"
+:: Open dashboard in browser
+start "" "http://localhost:%DASHBOARD_PORT%"
 
-:: Start proxy server
+:: Start server
 node dist/proxy.js
-
-pause

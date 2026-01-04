@@ -1,17 +1,17 @@
 /**
  * TokenSage Dashboard HTML Generator
- * Modern, minimalist UI inspired by xlab.id.vn style
+ * Windows Local App - AI Usage Tracker
  */
 
 export function getDashboardHTML(proxyPort: number): string {
     const dollarSign = '\u0024';
     
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TokenSage - AI Usage Dashboard</title>
+    <title>TokenSage - Theo dõi AI Usage</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -570,7 +570,7 @@ export function getDashboardHTML(proxyPort: number): string {
     </main>
     
     <footer class="footer">
-        <p>TokenSage Dashboard • Proxy: <a href="http://localhost:${proxyPort}">localhost:${proxyPort}</a></p>
+        <p>TokenSage - Theo dõi AI Usage • Proxy: <a href="http://localhost:${proxyPort}">localhost:${proxyPort}</a></p>
     </footer>
     
     <script>
