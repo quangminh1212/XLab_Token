@@ -5,10 +5,9 @@
 ## Tính năng
 
 - 📊 Dashboard realtime theo dõi usage
-- 💰 Tính chi phí tự động cho 350+ models
-- 📈 Thống kê theo ngày/tổng
+- 💰 Tính chi phí tự động cho 350+ models  
 - 📋 Live Log panel
-- 🌐 Auto intercept tất cả AI requests (mitmproxy)
+- 🌐 **Transparent proxy** - intercept TẤT CẢ traffic tự động (WinDivert)
 
 ## Cài đặt
 
@@ -22,9 +21,11 @@
 run.bat
 ```
 
-**Lần đầu sử dụng** (cài certificate):
-1. Chạy `run.bat`
-2. Mở browser, vào http://mitm.it
+**Chạy với quyền Administrator** để transparent proxy hoạt động.
+
+**Lần đầu** - cài certificate:
+1. Chạy `run.bat` 
+2. Mở browser: http://mitm.it
 3. Tải và cài certificate Windows
 
 ## Dừng
@@ -32,12 +33,7 @@ run.bat
 ```
 stop.bat
 ```
-hoặc nhấn `Ctrl+C`
 
 ## Dashboard
 
 http://localhost:4001
-
-## Data
-
-Dữ liệu lưu trong `data/usage_history.json`

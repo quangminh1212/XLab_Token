@@ -63,22 +63,34 @@ start /b cmd /c "node dist/proxy.js"
 timeout /t 2 /nobreak >nul
 
 if "%USE_MITM%"=="1" (
-    :: Enable Windows system proxy
-    echo [INFO] Enabling Windows system proxy...
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 1 /f >nul
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d "127.0.0.1:8080" /f >nul
-    
     echo.
     echo ───────────────────────────────────────────────────────────────
-    echo   ✅ FULL TRACKING MODE (mitmproxy)
+    echo   ✅ TRANSPARENT PROXY MODE (WinDivert)
     echo   Dashboard:  http://localhost:4001
-    echo   Proxy:      127.0.0.1:8080
+    echo   Intercepts ALL local traffic automatically!
     echo ───────────────────────────────────────────────────────────────
     echo.
     echo   ⚠️  First time? Install certificate:
     echo   1. Open browser: http://mitm.it
     echo   2. Download and install Windows certificate
+    echo   3. Run this script as Administrator
     echo ───────────────────────────────────────────────────────────────
+    echo.
+    echo   Press Ctrl+C to stop
+    echo.
+    
+    :: Open dashboard
+    start "" "http://localhost:4001"
+    
+    :: Start mitmproxy in LOCAL mode (transparent proxy with WinDivert)
+    :: This intercepts ALL traffic without needing system proxy settings
+    "%MITMDUMP%" --mode local -s addon.py --set block_global=false
+    
+    :: Cleanup when stopped
+    echo.
+    echo [INFO] Stopping...
+    taskkill /f /im node.exe >nul 2>&1
+    echo [INFO] Done.
 ) else (
     echo.
     echo ───────────────────────────────────────────────────────────────
@@ -89,29 +101,12 @@ if "%USE_MITM%"=="1" (
     echo   Configure your AI IDE to use the proxy:
     echo   OPENAI_BASE_URL=http://localhost:4000/v1
     echo ───────────────────────────────────────────────────────────────
-)
-
-echo.
-echo   Press Ctrl+C to stop
-echo.
-
-:: Open dashboard
-start "" "http://localhost:4001"
-
-if "%USE_MITM%"=="1" (
-    :: Start mitmproxy
-    "%MITMDUMP%" -s addon.py --set block_global=false
     
-    :: Cleanup when stopped
+    :: Open dashboard
+    start "" "http://localhost:4001"
+    
     echo.
-    echo [INFO] Disabling Windows system proxy...
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 0 /f >nul
-    taskkill /f /im node.exe >nul 2>&1
-    echo [INFO] Done.
-) else (
-    :: Just run node server in foreground
-    echo [INFO] Running in manual proxy mode...
-    echo        Press Ctrl+C to stop
+    echo   Press any key to stop...
     pause >nul
     taskkill /f /im node.exe >nul 2>&1
 )

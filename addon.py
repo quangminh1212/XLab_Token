@@ -4,27 +4,33 @@ Intercept all AI API requests and send to TokenSage for tracking
 """
 
 import json
-import re
 import urllib.request
 from mitmproxy import http, ctx
 
 TOKENSAGE_URL = "http://localhost:4000/ingest"
 
-# Provider detection patterns
+# Provider detection patterns - expanded list
 PROVIDER_PATTERNS = {
-    "openai": ["api.openai.com"],
-    "anthropic": ["api.anthropic.com", "claude.ai"],
-    "google": ["generativelanguage.googleapis.com", "aiplatform.googleapis.com"],
-    "azure": ["openai.azure.com"],
+    "openai": ["api.openai.com", "openai.azure.com"],
+    "anthropic": ["api.anthropic.com", "claude.ai", "anthropic"],
+    "google": ["generativelanguage.googleapis.com", "aiplatform.googleapis.com", "gemini"],
     "aws": ["bedrock", "amazonaws.com"],
-    "deepseek": ["api.deepseek.com"],
-    "mistral": ["api.mistral.ai"],
-    "groq": ["api.groq.com"],
-    "together": ["api.together.xyz"],
-    "perplexity": ["api.perplexity.ai"],
-    "cohere": ["api.cohere.ai"],
-    "replicate": ["api.replicate.com"],
+    "azure": ["azure.com", "microsoft.com/ai", "cognitiveservices"],
+    "deepseek": ["deepseek.com"],
+    "mistral": ["mistral.ai"],
+    "groq": ["groq.com"],
+    "together": ["together.xyz", "together.ai"],
+    "perplexity": ["perplexity.ai"],
+    "cohere": ["cohere.ai", "cohere.com"],
+    "replicate": ["replicate.com"],
+    "huggingface": ["huggingface.co", "hf.co"],
+    "fireworks": ["fireworks.ai"],
+    "anyscale": ["anyscale.com"],
+    "kiro": ["kiro", "amazon"],  # Kiro uses AWS
 }
+
+# Keywords to identify AI API calls
+AI_KEYWORDS = ["chat", "completions", "messages", "generate", "inference", "predict", "embed"]
 
 def detect_provider(host: str) -> str:
     host_lower = host.lower()
@@ -32,12 +38,26 @@ def detect_provider(host: str) -> str:
         for pattern in patterns:
             if pattern in host_lower:
                 return provider
-    return "unknown"
+    return ""
+
+def is_ai_request(host: str, path: str) -> bool:
+    """Check if this looks like an AI API request"""
+    provider = detect_provider(host)
+    if provider:
+        return True
+    
+    # Check path for AI-related keywords
+    path_lower = path.lower()
+    for keyword in AI_KEYWORDS:
+        if keyword in path_lower:
+            return True
+    
+    return False
 
 def extract_model(body: dict) -> str:
     return body.get("model", "unknown")
 
-def extract_usage_from_response(body: dict, provider: str) -> tuple:
+def extract_usage_from_response(body: dict) -> tuple:
     """Extract input/output tokens from response"""
     input_tokens = 0
     output_tokens = 0
@@ -67,31 +87,40 @@ def send_to_tokensage(data: dict):
         )
         urllib.request.urlopen(req, timeout=2)
     except Exception as e:
-        ctx.log.warn(f"TokenSage: Failed to send data: {e}")
+        ctx.log.warn(f"TokenSage send error: {e}")
 
 class TokenSageAddon:
     def __init__(self):
         self.pending_requests = {}
+        self.seen_hosts = set()
     
     def request(self, flow: http.HTTPFlow):
         """Capture request data"""
         host = flow.request.host
+        path = flow.request.path
+        
+        # Log new hosts for debugging
+        if host not in self.seen_hosts:
+            self.seen_hosts.add(host)
+            ctx.log.info(f"[TokenSage] New host: {host}")
         
         # Check if this is an AI API request
-        if not any(p in host.lower() for patterns in PROVIDER_PATTERNS.values() for p in patterns):
+        if not is_ai_request(host, path):
             return
+        
+        ctx.log.info(f"[TokenSage] AI Request detected: {host}{path}")
         
         try:
             body = json.loads(flow.request.content) if flow.request.content else {}
             self.pending_requests[flow.id] = {
                 "host": host,
-                "path": flow.request.path,
+                "path": path,
                 "model": extract_model(body),
-                "provider": detect_provider(host),
+                "provider": detect_provider(host) or "unknown",
                 "request_body": body
             }
-        except:
-            pass
+        except Exception as e:
+            ctx.log.warn(f"[TokenSage] Parse request error: {e}")
     
     def response(self, flow: http.HTTPFlow):
         """Process response and extract usage"""
@@ -102,7 +131,7 @@ class TokenSageAddon:
         
         try:
             response_body = json.loads(flow.response.content) if flow.response.content else {}
-            input_tokens, output_tokens = extract_usage_from_response(response_body, req_data["provider"])
+            input_tokens, output_tokens = extract_usage_from_response(response_body)
             
             # Get model from response if available
             model = response_body.get("model", req_data["model"])
@@ -119,8 +148,10 @@ class TokenSageAddon:
                     "request_id": f"mitm_{flow.id}"
                 }
                 send_to_tokensage(data)
-                ctx.log.info(f"TokenSage: {model} | {input_tokens}+{output_tokens} tokens")
+                ctx.log.info(f"[TokenSage] ✓ {model} | {input_tokens}+{output_tokens} tokens")
+            else:
+                ctx.log.info(f"[TokenSage] Response has no usage info: {req_data['host']}")
         except Exception as e:
-            ctx.log.warn(f"TokenSage: Error processing response: {e}")
+            ctx.log.warn(f"[TokenSage] Process response error: {e}")
 
 addons = [TokenSageAddon()]
