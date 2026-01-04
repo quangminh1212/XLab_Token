@@ -48,6 +48,18 @@ interface ProxyRequest {
 // In-memory request log (recent requests)
 const recentRequests: ProxyRequest[] = [];
 
+// In-memory traffic log (ALL captured requests)
+interface TrafficEntry {
+    timestamp: Date;
+    host: string;
+    path: string;
+    method: string;
+    isAi: boolean;
+    provider: string;
+}
+const recentTraffic: TrafficEntry[] = [];
+const MAX_TRAFFIC_ENTRIES = 100;
+
 // Generate unique request ID
 function generateRequestId(): string {
     return `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -473,6 +485,43 @@ const proxyServer = http.createServer(async (req, res) => {
         if (url.pathname === '/health' || url.pathname === '/tokensage/health') {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+            return;
+        }
+
+        // API endpoint to receive ALL traffic from mitmproxy (for display)
+        if (url.pathname === '/traffic' || url.pathname === '/tokensage/traffic') {
+            if (req.method === 'POST') {
+                try {
+                    const data = JSON.parse(body);
+                    const entry: TrafficEntry = {
+                        timestamp: new Date(),
+                        host: data.host || 'unknown',
+                        path: data.path || '/',
+                        method: data.method || 'GET',
+                        isAi: data.is_ai || false,
+                        provider: data.provider || '',
+                    };
+                    recentTraffic.unshift(entry);
+                    if (recentTraffic.length > MAX_TRAFFIC_ENTRIES) {
+                        recentTraffic.pop();
+                    }
+                    
+                    if (entry.isAi) {
+                        console.log(`[TRAFFIC] 🤖 ${entry.method} ${entry.host}${entry.path}`);
+                    }
+                    
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    res.end(JSON.stringify({ success: true }));
+                    return;
+                } catch {
+                    res.writeHead(200, { 'Access-Control-Allow-Origin': '*' });
+                    res.end();
+                    return;
+                }
+            }
+            // GET - return recent traffic
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify(recentTraffic.slice(0, 50)));
             return;
         }
 

@@ -8,6 +8,7 @@ import urllib.request
 from mitmproxy import http, ctx
 
 TOKENSAGE_URL = "http://localhost:4000/ingest"
+TOKENSAGE_TRAFFIC_URL = "http://localhost:4000/traffic"
 
 # Provider detection patterns - expanded list
 PROVIDER_PATTERNS = {
@@ -89,6 +90,19 @@ def send_to_tokensage(data: dict):
     except Exception as e:
         ctx.log.warn(f"TokenSage send error: {e}")
 
+def send_traffic_log(data: dict):
+    """Send ALL traffic to TokenSage for display"""
+    try:
+        req = urllib.request.Request(
+            TOKENSAGE_TRAFFIC_URL,
+            data=json.dumps(data).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        urllib.request.urlopen(req, timeout=1)
+    except:
+        pass  # Silent fail for traffic logs
+
 class TokenSageAddon:
     def __init__(self):
         self.pending_requests = {}
@@ -98,14 +112,29 @@ class TokenSageAddon:
         """Capture request data"""
         host = flow.request.host
         path = flow.request.path
+        method = flow.request.method
+        
+        # Log ALL traffic to dashboard
+        is_ai = is_ai_request(host, path)
+        provider = detect_provider(host) if is_ai else ""
+        
+        traffic_data = {
+            "host": host,
+            "path": path[:100],  # Truncate long paths
+            "method": method,
+            "is_ai": is_ai,
+            "provider": provider,
+            "timestamp": None  # Will be set by server
+        }
+        send_traffic_log(traffic_data)
         
         # Log new hosts for debugging
         if host not in self.seen_hosts:
             self.seen_hosts.add(host)
             ctx.log.info(f"[TokenSage] New host: {host}")
         
-        # Check if this is an AI API request
-        if not is_ai_request(host, path):
+        # Only process AI requests for token tracking
+        if not is_ai:
             return
         
         ctx.log.info(f"[TokenSage] AI Request detected: {host}{path}")

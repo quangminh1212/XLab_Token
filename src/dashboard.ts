@@ -651,6 +651,16 @@ export function getDashboardHTML(proxyPort: number): string {
                 <div class="log-empty">Waiting for requests...</div>
             </div>
         </section>
+        
+        <section class="log-section fade-in" style="margin-top: 16px;">
+            <div class="log-header">
+                <h3 class="log-title">🌐 All Captured Traffic</h3>
+                <span style="color: var(--text-muted); font-size: 0.75rem;" id="trafficCount">0 requests</span>
+            </div>
+            <div class="log-content" id="trafficContent" style="height: 250px;">
+                <div class="log-empty">Waiting for traffic...</div>
+            </div>
+        </section>
     </main>
     
     <footer class="footer">
@@ -771,11 +781,48 @@ export function getDashboardHTML(proxyPort: number): string {
             }
         }
         
+        async function loadTraffic() {
+            try {
+                const res = await fetch(PROXY_URL + '/traffic');
+                const traffic = await res.json();
+                
+                const trafficContent = document.getElementById('trafficContent');
+                const trafficCount = document.getElementById('trafficCount');
+                
+                if (!traffic || traffic.length === 0) {
+                    trafficContent.innerHTML = '<div class="log-empty">Waiting for traffic...</div>';
+                    trafficCount.textContent = '0 requests';
+                    return;
+                }
+                
+                trafficCount.textContent = traffic.length + ' requests';
+                
+                trafficContent.innerHTML = traffic.map(t => {
+                    const time = new Date(t.timestamp).toLocaleTimeString('vi-VN', { hour12: false });
+                    const icon = t.isAi ? '🤖' : '📡';
+                    const hostClass = t.isAi ? 'log-model' : '';
+                    const providerTag = t.provider ? ' <span class="log-provider">[' + t.provider + ']</span>' : '';
+                    return '<div class="log-entry">' +
+                        '<span class="log-time">[' + time + ']</span> ' +
+                        icon + ' ' +
+                        '<span style="color: #60a5fa;">' + t.method + '</span> ' +
+                        '<span class="' + hostClass + '">' + t.host + '</span>' +
+                        '<span style="color: #6b7280;">' + t.path.substring(0, 50) + '</span>' +
+                        providerTag +
+                        '</div>';
+                }).join('');
+            } catch (err) {
+                console.error('Failed to load traffic:', err);
+            }
+        }
+        
         // Initial load
         loadStats();
+        loadTraffic();
         
         // Auto refresh every 5 seconds
         setInterval(loadStats, 5000);
+        setInterval(loadTraffic, 2000);
     </script>
 </body>
 </html>`;
