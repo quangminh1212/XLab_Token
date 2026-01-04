@@ -3,7 +3,7 @@
 net session >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [INFO] Requesting Administrator privileges...
-    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    powershell -NoProfile -Command "Start-Process cmd -ArgumentList '/c \"%~f0\"' -Verb RunAs"
     exit /b
 )
 
