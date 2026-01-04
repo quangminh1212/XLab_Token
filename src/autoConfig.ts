@@ -8,7 +8,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-const PROXY_URL = 'http://localhost:4000/v1';
+const PROXY_URL = 'http://localhost:4000/v1' as const;
+void PROXY_URL; // Used for documentation/reference
 
 interface ConfigResult {
     success: boolean;

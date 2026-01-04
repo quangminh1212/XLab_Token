@@ -35,3 +35,12 @@ __pycache__/
 # Runtime data
 data/usage_history.json
 data/mitmproxy_usage.json
+data/all_requests.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# mitmproxy certificate
+mitmproxy-ca-cert.cer
