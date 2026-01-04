@@ -1,4 +1,12 @@
 @echo off
+:: Check for admin rights and self-elevate if needed
+net session >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [INFO] Requesting Administrator privileges...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit /b
+)
+
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
@@ -73,7 +81,6 @@ if "%USE_MITM%"=="1" (
     echo   ⚠️  First time? Install certificate:
     echo   1. Open browser: http://mitm.it
     echo   2. Download and install Windows certificate
-    echo   3. Run this script as Administrator
     echo ───────────────────────────────────────────────────────────────
     echo.
     echo   Press Ctrl+C to stop
@@ -83,7 +90,6 @@ if "%USE_MITM%"=="1" (
     start "" "http://localhost:4001"
     
     :: Start mitmproxy in LOCAL mode (transparent proxy with WinDivert)
-    :: This intercepts ALL traffic without needing system proxy settings
     "%MITMDUMP%" --mode local -s addon.py --set block_global=false
     
     :: Cleanup when stopped
