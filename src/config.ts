@@ -122,3 +122,47 @@ export const VALIDATION = {
     /** Maximum tokens to include in response */
     MAX_TOKENS_IN_RESPONSE: 10000,
 } as const;
+
+// ==================== Token Estimation ====================
+export const TOKEN_ESTIMATION = {
+    /** Average characters per token (for estimation) */
+    CHARS_PER_TOKEN: 4,
+    /** Text preview length */
+    TEXT_PREVIEW_LENGTH: 100,
+} as const;
+
+// ==================== Usage Tracker ====================
+export const USAGE_TRACKER = {
+    /** Maximum recent records to keep */
+    MAX_RECENT_RECORDS: 100,
+} as const;
+
+// ==================== Proxy ====================
+export const PROXY = {
+    /** Default proxy port */
+    DEFAULT_PORT: 4000,
+    /** Default dashboard port */
+    DEFAULT_DASHBOARD_PORT: 4001,
+    /** Maximum recent requests to keep in memory */
+    MAX_RECENT_REQUESTS: 100,
+} as const;
+
+// ==================== Provider Detection ====================
+export const PROVIDER_PATTERNS: Record<string, string[]> = {
+    openai: ['openai'],
+    anthropic: ['anthropic', 'claude.ai'],
+    google: ['google', 'generativelanguage'],
+    cursor: ['cursor'],
+    windsurf: ['codeium', 'windsurf'],
+    kiro: ['kiro'],
+    copilot: ['copilot', 'github'],
+    aws: ['bedrock', 'codewhisperer', 'q.us-'],
+    azure: ['azure'],
+    mistral: ['mistral'],
+    cohere: ['cohere'],
+    deepseek: ['deepseek'],
+    together: ['together'],
+    groq: ['groq'],
+    perplexity: ['perplexity'],
+    replicate: ['replicate'],
+} as const;

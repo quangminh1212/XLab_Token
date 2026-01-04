@@ -192,3 +192,12 @@ export interface ToolResponse {
     content: ToolContent[];
     isError?: boolean;
 }
+
+// ==================== Helper Types ====================
+
+/** Provider name type */
+export type ProviderName = 
+    | 'openai' | 'anthropic' | 'google' | 'cursor' | 'windsurf' 
+    | 'kiro' | 'copilot' | 'aws' | 'azure' | 'mistral' 
+    | 'cohere' | 'deepseek' | 'together' | 'groq' 
+    | 'perplexity' | 'replicate' | 'unknown';
