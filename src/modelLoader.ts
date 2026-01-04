@@ -6,90 +6,114 @@
 
 import * as fs from 'fs';
 import { MODELS_FILE, PRICING_FILE, ENCODINGS_FILE } from './paths.js';
+import { CACHE_TIMEOUT_MS } from './config.js';
 import type { ModelPricing, ModelInfo, ModelEncoding } from './types.js';
 
 // Re-export types for backward compatibility
 export type { ModelPricing, ModelInfo, ModelEncoding };
 
-// Cache loaded data
-let cachedModels: ModelInfo[] | null = null;
-let cachedPricing: Record<string, ModelPricing> | null = null;
-let cachedEncodings: Record<string, ModelEncoding> | null = null;
-let lastLoadTime: number = 0;
+// Generic cache structure
+interface CacheEntry<T> {
+    data: T | null;
+    lastLoadTime: number;
+}
 
-// Cache timeout (5 phút)
-const CACHE_TIMEOUT = 5 * 60 * 1000;
+// Cache for all data types
+const cache = {
+    models: { data: null, lastLoadTime: 0 } as CacheEntry<ModelInfo[]>,
+    pricing: { data: null, lastLoadTime: 0 } as CacheEntry<Record<string, ModelPricing>>,
+    encodings: { data: null, lastLoadTime: 0 } as CacheEntry<Record<string, ModelEncoding>>,
+};
+
+/**
+ * Generic function to load JSON data with caching
+ */
+function loadJsonData<T>(
+    filePath: string,
+    cacheEntry: CacheEntry<T>,
+    extractor: (data: unknown) => T,
+    defaultValue: T,
+    forceReload: boolean = false
+): T {
+    const now = Date.now();
+
+    if (!forceReload && cacheEntry.data !== null && now - cacheEntry.lastLoadTime < CACHE_TIMEOUT_MS) {
+        return cacheEntry.data;
+    }
+
+    try {
+        if (fs.existsSync(filePath)) {
+            const rawData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            cacheEntry.data = extractor(rawData);
+            cacheEntry.lastLoadTime = now;
+            return cacheEntry.data;
+        }
+    } catch (error) {
+        console.error(`Failed to load ${filePath}:`, error);
+    }
+
+    return defaultValue;
+}
+
+/**
+ * Generic partial match finder
+ */
+function findByPartialMatch<T>(
+    data: Record<string, T>,
+    searchId: string
+): T | undefined {
+    const id = searchId.toLowerCase();
+    
+    // Exact match first
+    if (data[id]) return data[id];
+    
+    // Partial match
+    for (const [key, value] of Object.entries(data)) {
+        if (key.toLowerCase().includes(id) || id.includes(key.toLowerCase())) {
+            return value;
+        }
+    }
+    
+    return undefined;
+}
 
 /**
  * Load models data từ file
  */
 export function loadModels(forceReload: boolean = false): ModelInfo[] {
-    const now = Date.now();
-
-    if (!forceReload && cachedModels && now - lastLoadTime < CACHE_TIMEOUT) {
-        return cachedModels;
-    }
-
-    try {
-        if (fs.existsSync(MODELS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(MODELS_FILE, 'utf-8'));
-            cachedModels = data.models || [];
-            lastLoadTime = now;
-            return cachedModels!;
-        }
-    } catch (error) {
-        console.error('Failed to load models.json:', error);
-    }
-
-    return [];
+    return loadJsonData(
+        MODELS_FILE,
+        cache.models,
+        (data: unknown) => (data as { models?: ModelInfo[] }).models || [],
+        [],
+        forceReload
+    );
 }
 
 /**
  * Load pricing data từ file
  */
 export function loadPricing(forceReload: boolean = false): Record<string, ModelPricing> {
-    const now = Date.now();
-
-    if (!forceReload && cachedPricing && now - lastLoadTime < CACHE_TIMEOUT) {
-        return cachedPricing;
-    }
-
-    try {
-        if (fs.existsSync(PRICING_FILE)) {
-            const data = JSON.parse(fs.readFileSync(PRICING_FILE, 'utf-8'));
-            cachedPricing = data.pricing || {};
-            lastLoadTime = now;
-            return cachedPricing!;
-        }
-    } catch (error) {
-        console.error('Failed to load pricing.json:', error);
-    }
-
-    return {};
+    return loadJsonData(
+        PRICING_FILE,
+        cache.pricing,
+        (data: unknown) => (data as { pricing?: Record<string, ModelPricing> }).pricing || {},
+        {},
+        forceReload
+    );
 }
 
 /**
  * Load encoding data từ file
  */
 export function loadEncodings(forceReload: boolean = false): Record<string, ModelEncoding> {
-    const now = Date.now();
-
-    if (!forceReload && cachedEncodings && now - lastLoadTime < CACHE_TIMEOUT) {
-        return cachedEncodings;
-    }
-
-    try {
-        if (fs.existsSync(ENCODINGS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(ENCODINGS_FILE, 'utf-8'));
-            cachedEncodings = data.encodings || {};
-            lastLoadTime = now;
-            return cachedEncodings as Record<string, ModelEncoding>;
-        }
-    } catch (error) {
-        console.error('Failed to load encodings.json:', error);
-    }
-
-    return {};
+    return loadJsonData(
+        ENCODINGS_FILE,
+        cache.encodings,
+        (data: unknown) => (data as { encodings?: Record<string, ModelEncoding> }).encodings || {},
+        {},
+        forceReload
+    );
 }
 
 /**
@@ -120,8 +144,7 @@ export function getLastUpdateTime(): Date | null {
  * Lấy số lượng models đã load
  */
 export function getModelsCount(): number {
-    const models = loadModels();
-    return models.length;
+    return loadModels().length;
 }
 
 /**
@@ -143,45 +166,14 @@ export function findModel(modelId: string): ModelInfo | undefined {
  * Lấy pricing cho model
  */
 export function getModelPricing(modelId: string): ModelPricing | undefined {
-    const pricing = loadPricing();
-    const id = modelId.toLowerCase();
-
-    // Thử tìm exact match
-    if (pricing[id]) {
-        return pricing[id];
-    }
-
-    // Thử tìm partial match
-    for (const [key, value] of Object.entries(pricing)) {
-        if (key.toLowerCase().includes(id) || id.includes(key.toLowerCase())) {
-            return value;
-        }
-    }
-
-    return undefined;
+    return findByPartialMatch(loadPricing(), modelId);
 }
 
 /**
  * Lấy encoding cho model
  */
 export function getModelEncoding(modelId: string): ModelEncoding {
-    const encodings = loadEncodings();
-    const id = modelId.toLowerCase();
-
-    // Thử tìm exact match
-    if (encodings[id]) {
-        return encodings[id];
-    }
-
-    // Thử tìm partial match
-    for (const [key, value] of Object.entries(encodings)) {
-        if (key.toLowerCase().includes(id) || id.includes(key.toLowerCase())) {
-            return value;
-        }
-    }
-
-    // Default encoding
-    return 'cl100k_base';
+    return findByPartialMatch(loadEncodings(), modelId) || 'cl100k_base';
 }
 
 /**
@@ -189,26 +181,24 @@ export function getModelEncoding(modelId: string): ModelEncoding {
  */
 export function getProviders(): string[] {
     const models = loadModels();
-    const providers = new Set(models.map(m => m.provider));
-    return [...providers].sort();
+    return [...new Set(models.map(m => m.provider))].sort();
 }
 
 /**
  * Lấy models theo provider
  */
 export function getModelsByProvider(provider: string): ModelInfo[] {
-    const models = loadModels();
-    return models.filter(m => m.provider.toLowerCase() === provider.toLowerCase());
+    const providerLower = provider.toLowerCase();
+    return loadModels().filter(m => m.provider.toLowerCase() === providerLower);
 }
 
 /**
  * Clear cache
  */
 export function clearCache(): void {
-    cachedModels = null;
-    cachedPricing = null;
-    cachedEncodings = null;
-    lastLoadTime = 0;
+    cache.models = { data: null, lastLoadTime: 0 };
+    cache.pricing = { data: null, lastLoadTime: 0 };
+    cache.encodings = { data: null, lastLoadTime: 0 };
 }
 
 /**
