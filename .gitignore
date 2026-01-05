@@ -36,6 +36,8 @@ __pycache__/
 data/usage_history.json
 data/mitmproxy_usage.json
 data/all_requests.log
+data/log.txt
+data/log_*.txt
 
 # Python cache
 __pycache__/

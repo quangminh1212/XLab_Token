@@ -5,10 +5,27 @@ Intercept all AI API requests and send to TokenSage for tracking
 
 import json
 import urllib.request
+import os
+from datetime import datetime
 from mitmproxy import http, ctx
 
 TOKENSAGE_URL = "http://localhost:4000/ingest"
 TOKENSAGE_TRAFFIC_URL = "http://localhost:4000/traffic"
+LOG_FILE = os.path.join(os.path.dirname(__file__), "data", "log.txt")
+
+def log_to_file(level: str, component: str, message: str, data: dict = None):
+    """Write log to file"""
+    try:
+        timestamp = datetime.now().isoformat()
+        log_line = f"[{timestamp}] [{level}] [MITM-{component}] {message}"
+        if data:
+            log_line += f" | {json.dumps(data)[:200]}"
+        log_line += "\n"
+        
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_line)
+    except:
+        pass
 
 # Provider detection patterns - expanded list
 PROVIDER_PATTERNS = {
@@ -107,6 +124,8 @@ class TokenSageAddon:
     def __init__(self):
         self.pending_requests = {}
         self.seen_hosts = set()
+        log_to_file("INFO", "INIT", "TokenSage mitmproxy addon started")
+        ctx.log.info("[TokenSage] Addon initialized")
     
     def request(self, flow: http.HTTPFlow):
         """Capture request data"""
@@ -114,9 +133,11 @@ class TokenSageAddon:
         path = flow.request.path
         method = flow.request.method
         
-        # Log ALL traffic to dashboard
+        # Log ALL traffic to file and dashboard
         is_ai = is_ai_request(host, path)
         provider = detect_provider(host) if is_ai else ""
+        
+        log_to_file("DEBUG", "REQUEST", f"{method} {host}{path[:50]}", {"is_ai": is_ai, "provider": provider})
         
         traffic_data = {
             "host": host,
@@ -131,12 +152,14 @@ class TokenSageAddon:
         # Log new hosts for debugging
         if host not in self.seen_hosts:
             self.seen_hosts.add(host)
+            log_to_file("INFO", "HOST", f"New host discovered: {host}")
             ctx.log.info(f"[TokenSage] New host: {host}")
         
         # Only process AI requests for token tracking
         if not is_ai:
             return
         
+        log_to_file("INFO", "AI", f"AI Request: {method} {host}{path[:80]}", {"provider": provider})
         ctx.log.info(f"[TokenSage] AI Request detected: {host}{path}")
         
         try:
@@ -149,6 +172,7 @@ class TokenSageAddon:
                 "request_body": body
             }
         except Exception as e:
+            log_to_file("WARN", "PARSE", f"Parse request error: {e}")
             ctx.log.warn(f"[TokenSage] Parse request error: {e}")
     
     def response(self, flow: http.HTTPFlow):
@@ -194,13 +218,16 @@ class TokenSageAddon:
                     "request_id": f"mitm_{flow.id}"
                 }
                 send_to_tokensage(data)
+                log_to_file("INFO", "USAGE", f"{model} | {input_tokens}+{output_tokens} tokens", data)
                 ctx.log.info(f"[TokenSage] ✓ {model} | {input_tokens}+{output_tokens} tokens")
             else:
+                log_to_file("DEBUG", "RESPONSE", f"No usage info from {req_data['host']}")
                 ctx.log.info(f"[TokenSage] Response has no usage info: {req_data['host']}")
         except json.JSONDecodeError:
             # Not a JSON response, skip silently
             pass
         except Exception as e:
+            log_to_file("ERROR", "RESPONSE", f"Process response error: {e}")
             ctx.log.warn(f"[TokenSage] Process response error: {e}")
 
 addons = [TokenSageAddon()]

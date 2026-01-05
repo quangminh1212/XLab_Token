@@ -17,6 +17,7 @@ import { calculateCost } from './costCalculator.js';
 import { getDashboardHTML } from './dashboard.js';
 import { PROXY, PROVIDER_PATTERNS } from './config.js';
 import { estimateTokens } from './tokenCounter.js';
+import { logger } from './logger.js';
 import type { ProviderName } from './types.js';
 
 // Configuration
@@ -279,7 +280,7 @@ function forwardRequest(
                 const responseBody = Buffer.concat(chunks).toString();
                 const latencyMs = Date.now() - startTime;
 
-                console.log(`[${requestId}] ${method} ${targetPath} -> ${res.statusCode} (${latencyMs}ms)`);
+                logger.debug('FORWARD', `${method} ${targetPath} -> ${res.statusCode}`, { latencyMs, requestId });
 
                 resolve({
                     statusCode: res.statusCode || 500,
@@ -290,7 +291,7 @@ function forwardRequest(
         });
 
         req.on('error', (error) => {
-            console.error(`[${requestId}] Request error:`, error.message);
+            logger.error('FORWARD', `Request error: ${error.message}`, { requestId });
             reject(error);
         });
 
@@ -432,13 +433,13 @@ function handleStreamingRequest(
                 }
 
                 const estimated = (totalInputTokens === 0 && totalOutputTokens === 0) ? ' (estimated)' : '';
-                console.log(`[${requestId}] STREAM: ${requestModel} | ${finalInputTokens}+${finalOutputTokens} tokens${estimated} | $${cost.toFixed(6)} | ${latencyMs}ms`);
+                logger.info('STREAM', `${requestModel} | ${finalInputTokens}+${finalOutputTokens} tokens${estimated}`, { cost: cost.toFixed(6), latencyMs, requestId });
             }
         });
     });
 
     proxyReq.on('error', (error) => {
-        console.error(`[${requestId}] Stream error:`, error.message);
+        logger.error('STREAM', `Stream error: ${error.message}`, { requestId });
         if (!res.headersSent) {
             res.writeHead(502);
         }
@@ -507,7 +508,9 @@ const proxyServer = http.createServer(async (req, res) => {
                     }
                     
                     if (entry.isAi) {
-                        console.log(`[TRAFFIC] 🤖 ${entry.method} ${entry.host}${entry.path}`);
+                        logger.info('TRAFFIC', `AI Request: ${entry.method} ${entry.host}${entry.path}`, { provider: entry.provider });
+                    } else {
+                        logger.debug('TRAFFIC', `${entry.method} ${entry.host}${entry.path}`);
                     }
                     
                     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -563,7 +566,7 @@ const proxyServer = http.createServer(async (req, res) => {
                             recentRequests.pop();
                         }
 
-                        console.log(`[MITM] ${model} | ${input_tokens}+${output_tokens} tokens | ${cost.toFixed(6)}`);
+                        logger.info('MITM', `${model} | ${input_tokens}+${output_tokens} tokens`, { cost: cost.toFixed(6), host, path: reqPath });
                         
                         res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
                         res.end(JSON.stringify({ success: true, cost: costResult }));
@@ -654,7 +657,7 @@ const proxyServer = http.createServer(async (req, res) => {
                     recentRequests.pop();
                 }
 
-                console.log(`[${requestId}] ${tokenUsage.model} | ${tokenUsage.inputTokens}+${tokenUsage.outputTokens} tokens | $${cost.toFixed(6)} | ${latencyMs}ms`);
+                logger.info('PROXY', `${tokenUsage.model} | ${tokenUsage.inputTokens}+${tokenUsage.outputTokens} tokens`, { cost: cost.toFixed(6), latencyMs, requestId });
             }
 
             const responseHeaders: Record<string, string> = { 'Access-Control-Allow-Origin': '*' };
@@ -668,7 +671,7 @@ const proxyServer = http.createServer(async (req, res) => {
             res.end(response.body);
 
         } catch (error) {
-            console.error(`[${requestId}] Error:`, error);
+            logger.error('PROXY', `Proxy error: ${(error as Error).message}`, { requestId });
             res.writeHead(502, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Proxy error', message: (error as Error).message }));
         }
@@ -685,6 +688,7 @@ const dashboardServer = http.createServer((_req, res) => {
 // Start servers
 function startProxy(): void {
     proxyServer.listen(PROXY_PORT, () => {
+        logger.info('SERVER', `Proxy started on port ${PROXY_PORT}`);
         console.log('');
         console.log('========================================================');
         console.log('           TokenSage Proxy Server Started               ');
@@ -692,19 +696,14 @@ function startProxy(): void {
         console.log(`  Proxy URL:     http://localhost:${PROXY_PORT}`);
         console.log(`  Dashboard:     http://localhost:${DASHBOARD_PORT}`);
         console.log('--------------------------------------------------------');
-        console.log('  Stats API:     /stats, /history');
+        console.log('  Stats API:     /stats, /history, /traffic');
+        console.log('  Log file:      data/log.txt');
         console.log('--------------------------------------------------------');
-        console.log('  Configure your IDE to use the proxy URL:');
-        console.log('');
-        console.log('  Cursor/Windsurf:');
-        console.log(`    Set OPENAI_BASE_URL=http://localhost:${PROXY_PORT}/v1`);
-        console.log('');
-        console.log('  Or use x-target-host header to specify target');
-        console.log('========================================================');
         console.log('');
     });
 
     dashboardServer.listen(DASHBOARD_PORT, () => {
+        logger.info('SERVER', `Dashboard started on port ${DASHBOARD_PORT}`);
         console.log(`Dashboard running at http://localhost:${DASHBOARD_PORT}`);
     });
 }
