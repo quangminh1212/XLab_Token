@@ -4,6 +4,7 @@
 
 import { get_encoding, Tiktoken } from 'tiktoken';
 import { TOKEN_ESTIMATION } from './config.js';
+import { logger } from './logger.js';
 
 export type ModelEncoding = 'cl100k_base' | 'p50k_base' | 'r50k_base' | 'o200k_base';
 
@@ -322,6 +323,8 @@ export function countTokens(
     const encoding = getEncodingForModel(model);
     const encoder = getEncoder(encoding);
     const tokens = encoder.encode(text);
+
+    logger.debug('TOKEN', `Counted ${tokens.length} tokens for model ${model}`, { encoding, textLength: text.length });
 
     return {
         text: text.length > TOKEN_ESTIMATION.TEXT_PREVIEW_LENGTH 

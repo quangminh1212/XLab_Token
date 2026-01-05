@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import { MODELS_FILE, PRICING_FILE, ENCODINGS_FILE } from './paths.js';
 import { CACHE_TIMEOUT_MS } from './config.js';
 import type { ModelPricing, ModelInfo, ModelEncoding } from './types.js';
+import { logger } from './logger.js';
 
 // Re-export types for backward compatibility
 export type { ModelPricing, ModelInfo, ModelEncoding };
@@ -38,6 +39,7 @@ function loadJsonData<T>(
     const now = Date.now();
 
     if (!forceReload && cacheEntry.data !== null && now - cacheEntry.lastLoadTime < CACHE_TIMEOUT_MS) {
+        logger.debug('LOADER', `Using cached data for ${filePath}`);
         return cacheEntry.data;
     }
 
@@ -46,10 +48,12 @@ function loadJsonData<T>(
             const rawData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
             cacheEntry.data = extractor(rawData);
             cacheEntry.lastLoadTime = now;
+            logger.info('LOADER', `Loaded data from ${filePath}`);
             return cacheEntry.data;
         }
+        logger.debug('LOADER', `File not found: ${filePath}`);
     } catch (error) {
-        console.error(`Failed to load ${filePath}:`, error);
+        logger.error('LOADER', `Failed to load ${filePath}: ${(error as Error).message}`);
     }
 
     return defaultValue;

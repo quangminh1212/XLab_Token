@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import type { UsageRecord, UsageStats, ModelUsageStats } from './types.js';
 import { DATA_DIR, USAGE_FILE } from './paths.js';
 import { USAGE_TRACKER } from './config.js';
+import { logger } from './logger.js';
 
 // Interface cho persistent data
 interface PersistentData {
@@ -218,10 +219,12 @@ export function loadPersistentData(): PersistentData {
     try {
         if (fs.existsSync(USAGE_FILE)) {
             const content = fs.readFileSync(USAGE_FILE, 'utf-8');
+            logger.debug('USAGE', `Loaded persistent data from ${USAGE_FILE}`);
             return JSON.parse(content) as PersistentData;
         }
+        logger.debug('USAGE', 'No existing usage file, creating default');
     } catch (error) {
-        console.error('Error loading persistent data:', error);
+        logger.error('USAGE', `Error loading persistent data: ${(error as Error).message}`);
     }
     return createDefaultPersistentData();
 }
@@ -234,11 +237,13 @@ export function savePersistentData(data: PersistentData): void {
         // Đảm bảo thư mục data tồn tại
         if (!fs.existsSync(DATA_DIR)) {
             fs.mkdirSync(DATA_DIR, { recursive: true });
+            logger.info('USAGE', `Created data directory: ${DATA_DIR}`);
         }
         data.lastUpdated = new Date().toISOString();
         fs.writeFileSync(USAGE_FILE, JSON.stringify(data, null, 2), 'utf-8');
+        logger.debug('USAGE', 'Saved persistent data');
     } catch (error) {
-        console.error('Error saving persistent data:', error);
+        logger.error('USAGE', `Error saving persistent data: ${(error as Error).message}`);
     }
 }
 
@@ -256,6 +261,8 @@ export function recordUsagePersistent(
     dailyTotal: { inputTokens: number; outputTokens: number; totalTokens: number; cost: number };
     allTimeTotal: { inputTokens: number; outputTokens: number; totalTokens: number; cost: number };
 } {
+    logger.info('USAGE', `Recording usage: ${model}`, { inputTokens, outputTokens, cost, requestId });
+    
     const data = loadPersistentData();
     const today = new Date().toISOString().split('T')[0];
 

@@ -5,6 +5,7 @@
 
 import type { ModelPricing, CostResult, ProjectEstimation } from './types.js';
 import { DEFAULT_PRICING, FORMATTING, ESTIMATION_DEFAULTS } from './config.js';
+import { logger } from './logger.js';
 
 // Re-export types
 export type { ModelPricing, CostResult, ProjectEstimation };
@@ -820,7 +821,7 @@ export function calculateCost(
 
     const decimalFactor = Math.pow(10, FORMATTING.COST_DECIMALS);
 
-    return {
+    const result = {
         model,
         inputTokens,
         outputTokens,
@@ -831,6 +832,15 @@ export function calculateCost(
         currency: FORMATTING.CURRENCY,
         pricing,
     };
+
+    logger.debug('COST', `Calculated cost for ${model}`, { 
+        inputTokens, 
+        outputTokens, 
+        totalCost: result.totalCost,
+        pricingUsed: pricing.name 
+    });
+
+    return result;
 }
 
 /**
